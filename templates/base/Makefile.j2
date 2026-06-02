@@ -1,0 +1,35 @@
+# Path: templates/base/Makefile.j2
+# ==============================================================================
+# {{ project_name }} - Developer automation command shortcuts
+# ==============================================================================
+
+.PHONY: install run-api run-mcp lint format clean
+
+install:
+	@echo "Installing project dependencies..."
+	uv sync
+
+run-api:
+	@echo "Starting FastAPI Gateway..."
+	uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+run-mcp:
+{% if has_mcp %}
+	@echo "Starting FastMCP Server..."
+	uv run python src/app/mcp_server/server.py
+{% else %}
+	@echo "MCP Server is not configured for this project."
+{% endif %}
+
+lint:
+	@echo "Running Ruff linter..."
+	uv run ruff check .
+
+format:
+	@echo "Running Ruff code formatter..."
+	uv run ruff format .
+
+clean:
+	@echo "Cleaning up Python cache files..."
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete

@@ -1,0 +1,25 @@
+# Path: templates/base/src/app/gateway/api/v1/api.py.j2
+"""
+Main router for API Version 1.
+
+This module acts as the central hub for all v1 endpoints. It imports individual 
+domain-driven routers (e.g., webhooks, users, feedback) and combines them into 
+a single APIRouter instance to be consumed by the top-level API router.
+"""
+
+import logging
+from fastapi import APIRouter
+
+# Import specific resource routers
+from app.gateway.api.v1.routers import webhooks
+
+logger = logging.getLogger(__name__)
+
+# Instantiate the v1 API router
+api_v1_router = APIRouter()
+
+# Register the Webhook endpoints with their specific prefix and OpenAPI tags
+logger.debug("Registering /webhooks router to v1 API.")
+api_v1_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
+
+# Note: Future endpoints like 'users' or 'analytics' will be appended here.

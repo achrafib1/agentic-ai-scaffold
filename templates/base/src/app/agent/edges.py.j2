@@ -1,0 +1,32 @@
+# Path: templates/base/src/app/agent/edges.py.j2
+"""
+Graph Routing Logic (Edges).
+
+Contains conditional functions that determine the flow of the state machine.
+Based on the current state, these functions return the name of the next node to execute.
+"""
+
+import logging
+from typing import Literal
+
+from app.agent.state import AgentState
+
+logger = logging.getLogger(__name__)
+
+def route_after_conversation(state: AgentState) -> Literal["tools", "__end__"]:
+    """
+    Determines the next step after the conversation node.
+    If the LLM returned tool calls, route to the tools node. Otherwise, end the graph.
+
+    Args:
+        state (AgentState): The current graph state.
+
+    Returns:
+        Literal["tools", "__end__"]: The name of the next node.
+    """
+    if state.get("requires_tools", False):
+        logger.debug("Routing condition met: Proceeding to 'tools' node.")
+        return "tools"
+    
+    logger.debug("Routing condition met: Proceeding to '__end__'.")
+    return "__end__"

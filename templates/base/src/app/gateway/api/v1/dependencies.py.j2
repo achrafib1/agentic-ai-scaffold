@@ -1,0 +1,64 @@
+# Path: templates/base/src/app/gateway/api/v1/dependencies.py.j2
+"""
+API Gateway Security Dependencies.
+
+Provides secure and generic dependency functions for checking authorization headers.
+Ensures API keys or system tokens are validated before executing downstream routing.
+"""
+
+import logging
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from rich.console import Console
+
+from shared.domain.config import settings
+
+logger = logging.getLogger(__name__)
+console = Console()
+
+# Open security scheme in the Swagger Docs
+reusable_oauth2 = HTTPBearer(
+    scheme_name="Bearer", 
+    description="Provide your generic Bearer API Token to authenticate."
+)
+
+
+async def validate_api_token(
+    credentials: HTTPAuthorizationCredentials = Depends(reusable_oauth2),
+) -> str:
+    """
+    Validates an incoming Bearer API Token against system settings.
+
+    Args:
+        credentials (HTTPAuthorizationCredentials): The authorization credentials 
+            extracted from the 'Authorization' header.
+
+    Raises:
+        HTTPException(401): If credentials are missing, malformed, or mismatch.
+
+    Returns:
+        str: The raw validated token string.
+    """
+    if not credentials:
+        logger.warning("Unauthenticated request: Authorization header was missing.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization credentials are required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+    system_key = settings.GROQ_API_KEY.get_secret_value() # Utilizing existing config keys as token fallback for demo
+
+    # In a real system, you can check against an API_KEY setting or a DB token table
+    if token != system_key and system_key != "":
+        logger.warning(f"Unauthorized request: Invalid API Token attempted: {token[:4]}...")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: The provided API Token is invalid.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    logger.debug("Request successfully authenticated via secure token validation.")
+    return token

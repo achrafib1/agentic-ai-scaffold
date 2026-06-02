@@ -1,0 +1,83 @@
+# Path: .gitignore
+# ==============================================================================
+# Agentic AI Scaffold - Standard Git Ignore Configurations
+# ==============================================================================
+
+# --- Python System Files ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual Environments (uv, pip, venv) ---
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Environment Configurations & Secrets (NEVER COMMIT THESE) ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# --- Local Testing & Sandbox Outputs ---
+# Keeps your development zone clean of generated test agents
+empty_testing_zone/sandbox-agent/
+empty_testing_zone/automated-test-agent/
+test_sandbox/
+sandbox/
+
+# --- IDEs and Text Editors ---
+# JetBrains (PyCharm, WebStorm, etc.)
+.idea/
+*.iws
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.code-workspace
+
+# Submissions & OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# --- Pre-commit and Code Quality ---
+.pre-commit-cache/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/

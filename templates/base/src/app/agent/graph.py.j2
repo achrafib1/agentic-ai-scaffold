@@ -1,0 +1,81 @@
+# Path: templates/base/src/app/agent/graph.py.j2
+"""
+LangGraph Assembly and Compilation.
+
+Constructs the StateGraph by mapping out nodes and edges.
+Compiles the graph into a runnable application that can be invoked by the API Gateway.
+"""
+
+import logging
+from langgraph.graph import StateGraph, START, END
+
+from app.agent.state import AgentState
+from app.agent.nodes import conversation_node
+from app.agent.edges import route_after_conversation
+
+# We will import the ToolNode dynamically if MCP is included
+{% if has_mcp %}
+from langgraph.prebuilt import ToolNode
+from app.agent.mcp_client import get_mcp_tools
+{% endif %}
+
+logger = logging.getLogger(__name__)
+
+def build_graph() -> StateGraph:
+    """
+    Builds and compiles the Agent state machine.
+
+    Returns:
+        CompiledGraph: The executable LangGraph application.
+    """
+    logger.info("Building the LangGraph State Machine.")
+    
+    workflow = StateGraph(AgentState)
+    
+    # --- Node Registration ---
+    # We wrap the conversation node to potentially inject MCP tools at runtime
+    async def wrapped_conversation_node(state: AgentState):
+        tools = []
+        {% if has_mcp %}
+        try:
+            tools = await get_mcp_tools()
+        except Exception as e:
+            logger.error(f"Failed to load MCP tools: {e}")
+        {% endif %}
+        return await conversation_node(state, tools=tools)
+
+    workflow.add_node("conversation", wrapped_conversation_node)
+    
+    {% if has_mcp %}
+    # We use a placeholder for ToolNode during graph construction.
+    # In production, tools are bound dynamically per invocation.
+    # For a robust architecture, you update this node with actual tools before run.
+    # Here we define a dynamic tool execution node.
+    async def execute_tools_node(state: AgentState):
+        logger.debug("Executing tools via MCP ToolNode.")
+        tools = await get_mcp_tools()
+        tool_node = ToolNode(tools)
+        return await tool_node.ainvoke(state)
+        
+    workflow.add_node("tools", execute_tools_node)
+    {% endif %}
+
+    # --- Edge Routing ---
+    workflow.add_edge(START, "conversation")
+    
+    {% if has_mcp %}
+    workflow.add_conditional_edges(
+        "conversation",
+        route_after_conversation,
+        {"tools": "tools", "__end__": END}
+    )
+    workflow.add_edge("tools", "conversation")
+    {% else %}
+    workflow.add_edge("conversation", END)
+    {% endif %}
+    
+    logger.info("LangGraph compiled successfully.")
+    return workflow.compile()
+
+# Singleton compiled graph instance for application use
+agent_app = build_graph()

@@ -1,0 +1,62 @@
+# Path: templates/base/src/app/agent/nodes.py.j2
+"""
+Graph Execution Nodes.
+
+Contains the discrete functions (nodes) that the LangGraph state machine will execute.
+Each node takes the current state, performs an action (like calling an LLM),
+and returns a state update dictionary.
+"""
+
+import logging
+from langchain_core.messages import SystemMessage
+
+from app.agent.state import AgentState
+from app.agent.utils import get_llm
+
+logger = logging.getLogger(__name__)
+
+# A standard system prompt. In production, this would be fetched from Opik.
+SYSTEM_PROMPT = """You are a highly capable enterprise AI assistant.
+Your goal is to be helpful, concise, and accurate.
+Always think step-by-step before answering complex questions."""
+
+
+async def conversation_node(state: AgentState, tools: list = None) -> dict:
+    """
+    The primary node where the LLM processes the conversation history.
+    If tools are provided (e.g., via MCP), it binds them to the model so the LLM
+    can decide whether to execute them.
+
+    Args:
+        state (AgentState): The current state of the graph.
+        tools (list, optional): A list of LangChain tools to bind to the model.
+
+    Returns:
+        dict: A state update containing the new LLM message.
+    """
+    logger.debug("Executing 'conversation_node'. Analyzing conversation state.")
+    
+    llm = get_llm(provider="groq", temperature=0.2)
+    
+    if tools:
+        logger.debug(f"Binding {len(tools)} tools to the LLM.")
+        llm = llm.bind_tools(tools)
+        
+    messages = state.get("messages", [])
+    
+    # Prepend the system prompt if it's not already in the history
+    if not messages or not isinstance(messages[0], SystemMessage):
+        messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
+
+    logger.info("Invoking LLM with current conversation history.")
+    response = await llm.ainvoke(messages)
+    
+    # Check if the LLM decided it needs to call a tool
+    requires_tools = bool(response.tool_calls)
+    if requires_tools:
+        logger.info(f"LLM requested tool execution: {response.tool_calls}")
+
+    return {
+        "messages": [response],
+        "requires_tools": requires_tools
+    }

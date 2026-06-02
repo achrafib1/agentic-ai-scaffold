@@ -1,0 +1,27 @@
+# Path: templates/extensions/mcp_server/src/app/mcp_server/server.py.j2
+"""
+FastMCP Server Entrypoint.
+
+Initializes the standalone Model Context Protocol server.
+This service acts as an independent tool registry that the LangGraph agent connects
+to securely, ensuring tools can be scaled and updated without restarting the agent.
+"""
+
+import logging
+from fastmcp import FastMCP
+from rich.console import Console
+
+console = Console()
+logger = logging.getLogger(__name__)
+
+console.print("[bold cyan]Initializing FastMCP Tool Server...[/bold cyan]")
+
+# Initialize the MCP Server
+mcp = FastMCP("Agent-Tools", description="Enterprise tools for the Agent")
+
+# Import and register tool modules here
+import app.mcp_server.tools.system_tools  # This automatically registers the @mcp.tool decorators
+
+if __name__ == "__main__":
+    logger.info("Starting FastMCP server on stdio transport.")
+    mcp.run()

@@ -1,0 +1,86 @@
+# Path: templates/base/src/main.py.j2
+"""
+Main application entry point.
+
+Initializes the FastAPI application, manages the lifespan (startup/shutdown),
+configures CORS, and registers the top-level API routers.
+"""
+
+import logging
+from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+{% if has_db %}
+from sqlalchemy import text
+from shared.infrastructure.db.session import engine, AsyncSessionLocal
+{% endif %}
+
+from shared.domain.config import settings
+from app.gateway.api.v1.api import api_v1_router
+
+# Configure rich logging
+logging.basicConfig(level=logging.DEBUG if settings.ENABLE_DEBUG_LOGS else logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Manages application startup and shutdown events.
+    """
+    logger.info(f"Application Startup: Initializing {settings.APP_NAME}...")
+    
+{% if has_db %}
+    # --- Database Startup Check ---
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        logger.info("Database connection verified successfully.")
+    except Exception as e:
+        logger.critical(f"Database connection failed during startup: {e}")
+        # In a strict production environment, you might raise the exception here.
+{% endif %}
+
+    yield  # Application serves requests here
+
+    # --- Shutdown Logic ---
+    logger.info("Application Shutdown: Closing resources...")
+{% if has_db %}
+    await engine.dispose()
+    logger.info("Database connection pool closed.")
+{% endif %}
+
+
+# Initialize FastAPI
+app = FastAPI(
+    title=settings.APP_NAME,
+    debug=settings.ENABLE_DEBUG_LOGS,
+    lifespan=lifespan,
+)
+
+# Configure CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount the versioned API router under the /api prefix
+app.include_router(api_v1_router, prefix="/api/v1")
+
+
+@app.get("/", summary="Root Health Check", tags=["Health"])
+async def root() -> dict[str, str]:
+    """
+    Root endpoint for load balancers and simple health checks.
+    """
+    logger.debug("Root endpoint accessed.")
+    return {"status": "ok", "message": f"Welcome to {settings.APP_NAME}!"}
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

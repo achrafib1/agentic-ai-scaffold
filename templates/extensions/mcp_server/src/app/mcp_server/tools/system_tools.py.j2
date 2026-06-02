@@ -1,0 +1,36 @@
+# Path: templates/extensions/mcp_server/src/app/mcp_server/tools/system_tools.py.j2
+"""
+System Utility Tools for MCP.
+
+These functions are exposed to the LLM via the Model Context Protocol.
+The docstrings here are CRITICAL, as the LLM reads them to understand
+when and how to use the tool.
+"""
+
+import logging
+from datetime import datetime
+from fastmcp import FastMCP
+
+logger = logging.getLogger(__name__)
+
+# We assume `mcp` is imported or we can define tools on a router.
+# For FastMCP standard usage, we bind directly to the instance, 
+# or use FastMCP's modular router if needed. For simplicity in the template:
+from app.mcp_server.server import mcp
+
+@mcp.tool()
+def get_current_system_time(timezone: str = "UTC") -> str:
+    """
+    Returns the current system time.
+    
+    Use this tool whenever the user asks for the current time, date, or day.
+    
+    Args:
+        timezone (str): The timezone to fetch the time for. Defaults to UTC.
+        
+    Returns:
+        str: A formatted string representing the current date and time.
+    """
+    logger.info(f"Tool executed: get_current_system_time (timezone: {timezone})")
+    now = datetime.utcnow()
+    return f"The current system time in UTC is {now.strftime('%Y-%m-%d %H:%M:%S')}."

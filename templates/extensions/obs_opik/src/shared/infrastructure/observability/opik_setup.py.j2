@@ -1,0 +1,76 @@
+# Path: templates/extensions/obs_opik/src/shared/infrastructure/observability/opik_setup.py.j2
+"""
+Opik Observability and Telemetry Configuration.
+
+This module initializes the connection to Comet ML's Opik platform.
+It configures global tracing capabilities so that every LLM call, FastMCP tool 
+execution, and LangGraph node transition is automatically logged, timed, and 
+evaluated for hallucination/toxicity in the Opik dashboard.
+"""
+
+import logging
+import os
+from typing import Any, Callable
+
+import opik
+from opik.config import OpikConfig
+from rich.console import Console
+
+from shared.domain.config import settings
+
+logger = logging.getLogger(__name__)
+console = Console()
+
+def initialize_observability() -> None:
+    """
+    Bootstraps the Opik telemetry client.
+    
+    Configures the workspace, project name, and authenticates using the API key.
+    If the API key is missing, tracing degrades gracefully without crashing the app.
+    """
+    opik_api_key = settings.OPIK_API_KEY.get_secret_value() if hasattr(settings, 'OPIK_API_KEY') else ""
+    
+    if not opik_api_key:
+        console.print("[bold yellow]⚠️ Opik API Key missing. Tracing is disabled.[/bold yellow]")
+        logger.warning("OPIK_API_KEY not found in environment. Observability disabled.")
+        return
+
+    try:
+        # Set OS environment variables required by the Opik Python SDK
+        os.environ["OPIK_API_KEY"] = opik_api_key
+        if hasattr(settings, 'OPIK_WORKSPACE') and settings.OPIK_WORKSPACE:
+            os.environ["OPIK_WORKSPACE"] = settings.OPIK_WORKSPACE
+            
+        # Configure Opik programmatically
+        opik.configure(
+            project_name=settings.OPIK_PROJECT_NAME,
+            host="https://www.comet.com/opik/api" # Default SaaS endpoint
+        )
+        
+        console.print(f"[bold green]📊 Opik Tracing Initialized for project: {settings.OPIK_PROJECT_NAME}[/bold green]")
+        logger.info("Opik Observability telemetry successfully initialized.")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize Opik Observability: {e}")
+        console.print(f"[bold red]❌ Opik Initialization Error:[/bold red] {e}")
+
+
+def trace_agent_execution(func: Callable) -> Callable:
+    """
+    A decorator wrapper around Opik's @opik.track().
+    
+    Apply this decorator to any critical LangGraph node or FastMCP tool function 
+    to automatically log its inputs, outputs, and execution duration.
+
+    Args:
+        func (Callable): The function to be traced.
+
+    Returns:
+        Callable: The traced function.
+    """
+    # Safely wrap with opik if the module is loaded
+    try:
+        return opik.track()(func)
+    except Exception:
+        # Graceful fallback if opik is not correctly configured
+        return func

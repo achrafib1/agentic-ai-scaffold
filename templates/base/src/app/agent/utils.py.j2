@@ -1,0 +1,57 @@
+# Path: templates/base/src/app/agent/utils.py.j2
+"""
+Utility functions for the LangGraph agent.
+
+Handles the initialization of Large Language Models (LLMs) based on environment
+configurations. Designed to gracefully fall back or support multiple providers
+(e.g., Groq, Gemini) while maintaining strict type safety.
+"""
+
+import logging
+from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.language_models.chat_models import BaseChatModel
+
+from shared.domain.config import settings
+
+logger = logging.getLogger(__name__)
+
+def get_llm(provider: str = "groq", temperature: float = 0.3) -> BaseChatModel:
+    """
+    Instantiates and returns a configured ChatModel.
+
+    Args:
+        provider (str): The LLM provider to use ('groq' or 'gemini').
+        temperature (float): The creativity/randomness parameter for the model.
+
+    Returns:
+        BaseChatModel: A configured LangChain chat model.
+
+    Raises:
+        ValueError: If an unsupported provider is requested.
+    """
+    logger.debug(f"Initializing LLM provider: {provider} with temp: {temperature}")
+    
+    if provider.lower() == "groq":
+        if not settings.GROQ_API_KEY.get_secret_value():
+            logger.warning("GROQ_API_KEY is missing. LLM calls will fail.")
+        return ChatGroq(
+            api_key=settings.GROQ_API_KEY.get_secret_value(),
+            model_name="llama-3.3-70b-versatile",
+            temperature=temperature,
+            max_retries=2,
+        )
+        
+    elif provider.lower() == "gemini":
+        if not settings.GEMINI_API_KEY.get_secret_value():
+            logger.warning("GEMINI_API_KEY is missing. LLM calls will fail.")
+        return ChatGoogleGenerativeAI(
+            api_key=settings.GEMINI_API_KEY.get_secret_value(),
+            model="gemini-1.5-pro",
+            temperature=temperature,
+            max_retries=2,
+        )
+        
+    else:
+        logger.error(f"Unsupported LLM provider requested: {provider}")
+        raise ValueError(f"Unsupported LLM provider: {provider}")

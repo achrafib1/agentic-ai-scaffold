@@ -1,0 +1,77 @@
+# Path: templates/base/src/shared/domain/config.py.j2
+"""
+Core application configuration settings.
+
+Defines the Pydantic BaseSettings class for loading application-wide
+configurations from environment variables or .env files.
+Ensures critical settings are present and correctly typed.
+"""
+
+import logging
+from typing import List, Union
+
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+
+class AppConfig(BaseSettings):
+    """
+    Application settings managed by Pydantic-Settings.
+    Fields without explicit defaults will trigger a ValidationError if missing.
+    """
+    APP_NAME: str = Field("Omni-Agent Enterprise", description="The public-facing name of the application.")
+    ENVIRONMENT: str = Field("development", description="deployment environment (development, staging, production)")
+    ENABLE_DEBUG_LOGS: bool = Field(False, description="Flag to enable verbose DEBUG level logging.")
+    
+    CORS_ORIGINS: List[str] = Field(
+        default=["http://localhost:3000", "http://127.0.0.1:3000"],
+        description="List of allowed origins for Cross-Origin Resource Sharing (CORS)."
+    )
+
+    # --- AI Model Providers ---
+    GROQ_API_KEY: SecretStr = Field(SecretStr(""), description="API Key for Groq fast inference models.")
+    GEMINI_API_KEY: SecretStr = Field(SecretStr(""), description="API Key for Google Gemini models.")
+
+{% if has_db %}
+    # --- Database Configuration ---
+    DATABASE_URL: str = Field(
+        "", 
+        description="Connection string for the PostgreSQL database (e.g., postgresql+asyncpg://user:pass@host/db)."
+    )
+{% endif %}
+
+{% if has_observability %}
+    # --- AI Observability Configuration ---
+    OPIK_API_KEY: SecretStr = Field(SecretStr(""), description="API Key for Opik Observability.")
+    OPIK_WORKSPACE: str = Field("", description="Opik Workspace name.")
+    OPIK_PROJECT_NAME: str = Field("{{ project_name }}", description="Opik Project Name.")
+{% endif %}
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        """Parses a comma-separated string of origins from environment variables."""
+        if isinstance(v, str) and not v.startswith("["):
+            return [origin.strip() for origin in v.split(",")]
+        if isinstance(v, list):
+            return v
+        raise ValueError("Invalid format for CORS_ORIGINS")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        logger.info("Application settings loaded successfully.")
+        if self.ENABLE_DEBUG_LOGS:
+            logger.debug("Debug logging is active.")
+
+
+# Singleton instance
+settings = AppConfig()

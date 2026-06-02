@@ -1,0 +1,90 @@
+# Path: templates/base/src/app/gateway/api/v1/routers/webhooks.py.j2
+"""
+Generic Webhook and Message Reception Router.
+
+Provides a unified ingestion endpoint for processing incoming events from 
+external channels. Normalizes payloads into a standard JSON schema, returns an 
+immediate 202 Accepted response, and executes the agent loop in a background task.
+"""
+
+import logging
+from typing import Any, Dict
+from pydantic import BaseModel, Field
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
+from rich.console import Console
+
+logger = logging.getLogger(__name__)
+console = Console()
+
+router = APIRouter()
+
+
+class GenericMessagePayload(BaseModel):
+    """
+    Normalized message schema representing an ingestion payload.
+    """
+    sender_id: str = Field(..., description="Unique identifier of the message sender.")
+    channel: str = Field(..., description="The platform channel the message originated from (e.g., web, whatsapp, telegram).")
+    text_content: str = Field(..., description="The textual content of the message.")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary metadata dictionary for channel-specific attributes.")
+
+
+async def process_agent_invocation_task(payload: GenericMessagePayload) -> None:
+    """
+    Background worker task to invoke the LangGraph agent workflow asynchronously.
+    Prevents the client request from timing out during long agent execution times.
+
+    Args:
+        payload (GenericMessagePayload): The validated message schema.
+    """
+    logger.info(f"Agent Task: Starting background execution for sender: {payload.sender_id} on channel: {payload.channel}")
+    try:
+        # Import the compiled graph dynamically to prevent circular imports during startup
+        from app.agent.graph import agent_app
+        
+        # Prepare the state for LangGraph input
+        from langchain_core.messages import HumanMessage
+        state_input = {"messages": [HumanMessage(content=payload.text_content)]}
+        
+        # Invoke the state machine
+        logger.debug(f"Invoking LangGraph with input text: '{payload.text_content}'")
+        result = await agent_app.ainvoke(
+            state_input, 
+            config={"configurable": {"thread_id": payload.sender_id}}
+        )
+        
+        last_message = result["messages"][-1].content
+        logger.info(f"Agent Task: Successfully generated response for {payload.sender_id}: '{last_message[:30]}...'")
+        
+    except Exception as e:
+        logger.error(f"Agent Task: Failed to execute background agent flow: {e}", exc_info=True)
+
+
+@router.post(
+    "/message", 
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Ingest Generic Message",
+    description="Universal webhook endpoint designed to accept incoming message events, immediately returning a 202 Accepted."
+)
+async def ingest_message(
+    payload: GenericMessagePayload, 
+    background_tasks: BackgroundTasks
+) -> Dict[str, str]:
+    """
+    Accepts incoming message payloads, validates them, and defers processing 
+    to a non-blocking background task.
+
+    Args:
+        payload (GenericMessagePayload): The validated input payload schema.
+        background_tasks (BackgroundTasks): FastAPI's native background task runner.
+
+    Returns:
+        Dict[str, str]: Status payload confirming receipt.
+    """
+    logger.info(f"Received incoming message event from channel: '{payload.channel}'")
+    
+    # Offload the agentic processing to the background
+    background_tasks.add_task(process_agent_invocation_task, payload)
+    
+    return {"status": "accepted", "message": "Message received and added to background queue."}

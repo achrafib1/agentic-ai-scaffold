@@ -1,0 +1,11 @@
+# Path: templates/extensions/db_sqlalchemy/src/shared/infrastructure/db/base.py.j2
+"""
+Declarative base module.
+
+Defines the foundational Base class for all SQLAlchemy ORM models.
+Must be imported by all model files and the Alembic env.py script.
+"""
+
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()

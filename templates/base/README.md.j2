@@ -1,0 +1,80 @@
+# Path: templates/base/README.md.j2
+# 🤖 {{ project_name }}
+
+Enterprise-grade, highly scalable Omni-channel AI Agent Backend.
+Built using a Modular Monolith architecture, leveraging **FastAPI** for gateway communications, **LangGraph** for conversational logic, and **FastMCP** for decoupled tool scaling.
+
+---
+
+## 🏗️ Architectural Overview
+
+This project is built using **Domain-Driven Design (DDD)** and **Clean Architecture** principles:
+
+```text
+src/
+├── shared/                     # 📦 SHARED RESOURCES (Universal Modules)
+│   ├── domain/                 # Business schemas (Pydantic), ORM models, and Custom Exceptions
+│   └── infrastructure/         # External clients: DB (SQLAlchemy Engine) & Observability (Opik)
+│
+└── app/                        # 🚀 RUNNABLE APPLICATIONS
+    ├── gateway/                # FastAPI Gateway (Handles incoming webhooks & APIs)
+    ├── agent/                  # LangGraph Brain (State machines & Agent logic)
+    └── mcp_server/             # Standalone FastMCP Tool Server (If enabled)
+```
+
+### Key Architectural Features:
+1. **Decoupled Gateway:** The FastAPI routers are isolated from LangGraph. The gateway normalizes incoming payloads into a generic `OmniMessage` schema, ensuring you can add Telegram or Discord without changing the agent logic.
+2. **Decoupled Tools (MCP):** Tools are treated as independent services. They are registered on a standalone FastMCP server. The LangGraph agent dynamically loads them at runtime, allowing you to update or scale tools without stopping your agent.
+3. **Async Database Engine:** Designed with SQLAlchemy `asyncio` and `asyncpg` to handle concurrent user connections typical of real-time AI agents.
+
+---
+
+## 🛠️ Getting Started (For Windows CMD)
+
+### 1. Prerequisites
+Ensure you have the blazing-fast Python package manager **`uv`** installed.
+```cmd
+pip install uv
+```
+
+### 2. Install Dependencies
+Initialize the virtual environment and install all packages locked in the lockfile:
+```cmd
+make install
+```
+
+### 3. Environment Setup
+Copy the environment template and populate it with your actual keys (Groq, Gemini, database connections):
+```cmd
+copy .env.example .env
+```
+
+### 4. Running the FastAPI Gateway
+Start the local development server with live reload enabled:
+```cmd
+make run-api
+```
+Once running, open your browser and navigate to the interactive documentation:
+* **Interactive Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+* **API Health Check:** [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+
+{% if has_mcp %}
+### 5. Running the FastMCP Tool Server
+Start the tool registry server:
+```cmd
+make run-mcp
+```
+{% endif %}
+
+---
+
+## 📈 Quality Gates
+
+Before pushing code to production, always verify formatting and typing:
+```cmd
+# Run Ruff Code Formatter
+make format
+
+# Run Ruff Code Linter
+make lint
+```

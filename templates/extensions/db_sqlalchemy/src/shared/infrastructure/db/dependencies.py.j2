@@ -1,0 +1,38 @@
+# Path: templates/extensions/db_sqlalchemy/src/shared/infrastructure/db/dependencies.py.j2
+"""
+FastAPI dependencies related to database sessions.
+
+Provides dependency functions injected into API endpoints to manage 
+the lifecycle of database sessions per request seamlessly.
+"""
+
+import logging
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.infrastructure.db.session import AsyncSessionLocal
+
+logger = logging.getLogger(__name__)
+
+
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency function to provide and manage an asynchronous database session.
+
+    Creates a new AsyncSession for each request and guarantees that 
+    the session is closed afterward, avoiding connection leaks.
+
+    Yields:
+        AsyncSession: An asynchronous SQLAlchemy session.
+    """
+    session: AsyncSession = AsyncSessionLocal()
+    try:
+        logger.debug("Database session opened for request.")
+        yield session
+    except Exception as e:
+        logger.error(f"Error during database session: {e}")
+        await session.rollback()
+        raise
+    finally:
+        logger.debug("Database session for request closed.")
+        await session.close()
