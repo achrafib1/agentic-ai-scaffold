@@ -1,122 +1,204 @@
-# agentic-ai-scaffold
+# Agentic AI Scaffold
 
-<!-- Path: README.md -->
+An interactive Python CLI for generating a modular FastAPI and LangGraph
+starter project. Optional template overlays add asynchronous SQLAlchemy
+infrastructure, a FastMCP tool server example, Opik configuration helpers, and
+pre-commit hooks without duplicating the base scaffold.
 
-# 🛠️ Agentic AI Scaffold
+> [!IMPORTANT]
+> This project is an early-stage scaffold and reference implementation. It
+> creates a useful starting structure, but generated applications still require
+> product-specific security, persistence models, deployment configuration, and
+> integration testing before production use.
 
-An enterprise-grade Command Line Interface (CLI) scaffolding engine designed to generate modular, scalable, and production-ready AI Agent backends.
+## What it generates
 
-This tool automates the creation of a modern **Modular Monolith** architecture, integrating **FastAPI** (for gateway requests), **LangGraph** (for stateful agent workflows), and **FastMCP** (for decoupled, scalable tool execution).
+Every generated project includes:
 
----
+- a FastAPI application with a health endpoint and versioned webhook route;
+- a LangGraph conversation graph backed by Groq or Gemini adapters;
+- typed, environment-based configuration with Pydantic Settings;
+- a `uv`-managed Python project and local virtual environment;
+- Ruff development tooling and a small Makefile command surface; and
+- a generated README that reflects the selected options.
 
-## 🌟 Key Architectural Decisions
+The interactive wizard can also add:
 
-Unlike basic starter templates, `agentic-ai-scaffold` enforces robust software engineering standards:
+| Option | Generated capability | Current status |
+| --- | --- | --- |
+| SQLAlchemy | Async engine, session dependency, declarative base, and `models` package | Implemented; migrations and application models are not generated |
+| FastMCP | A standalone stdio server and example system-time tool | Server implemented; agent-side transport is demonstration-only |
+| Opik | Configuration and tracing helper module | Helper implemented; applications must initialize and apply it |
+| Pre-commit | Ruff hooks and reproducible development dependencies | Implemented |
 
-- **Dynamic Scaffolding (No Code-In-Strings):** Generated code templates reside in raw, easily-editable physical directory layers (`templates/`). The CLI uses a **Jinja2 Directory Walking Engine** to inject variables and compile code dynamically with 100% platform-agnostic POSIX pathing [2].
-- **Decoupled Agentic Loop:** The generated gateway (FastAPI) is entirely separated from the reasoning engine (LangGraph). The gateway normalizes incoming payloads into an `OmniMessage` schema, meaning you can plug in WhatsApp, Telegram, or Discord gateways without rewriting your core agent logic.
-- **Decoupled Tools via FastMCP:** All external integrations (database RAG, web scrapers, APIs) are built as separate tools on an isolated Model Context Protocol (MCP) server. Your LangGraph agent retrieves these dynamically at runtime, allowing you to update tool logic without restarting the state machine.
-- **Asynchronous Database Core:** Utilizes `asyncio`, `asyncpg`, and SQLAlchemy Async sessions to support high-concurrency environments typical of asynchronous AI agents. Includes a production-grade, asynchronous **Alembic** migration setup out of the box.
-- **Autonomous Virtual Environments:** The CLI automatically checks for the ultra-fast Rust-based package manager **`uv`**, prompts to install it if missing, pins your Python version, and builds a dedicated `.venv` in the target project.
+SQLModel, MongoDB, and Phoenix appear as planned choices in the CLI and exit
+without generating a project.
 
----
+## Architecture
 
-## 🚀 Installation & Local Setup
+The CLI separates project coordination from file generation:
 
-### 1. Prerequisites
-
-Ensure you have Python 3.12+ installed on your machine. The CLI tool is built to handle dependency management on both Windows CMD and Unix shells natively.
-
-### 2. Global Installation
-
-Navigate to your cloned `agentic-ai-scaffold` directory and install the CLI globally in editable mode:
-
-```cmd
-:: Windows CMD
-cd C:\path\to\cloned\agentic-ai-scaffold
-uv pip install -e .
+```text
+CLI prompts
+    │
+    ▼
+ProjectConfiguration
+    │
+    ▼
+ScaffoldOrchestrator ──► uv / Git commands
+    │
+    ▼
+TemplateRenderer
+    ├── base template
+    └── selected extension overlays
+            │
+            ▼
+      generated project
 ```
+
+Templates are regular files under `templates/`. Extension directories mirror
+the generated project layout, so an overlay can add or replace files without
+placing generated source code inside Python strings.
+
+See [Architecture](docs/architecture.md) for component boundaries and the
+generated request flow. See [Extending the scaffold](docs/extending.md) for the
+overlay contract.
+
+## Requirements
+
+- Python 3.12 or newer
+- [`uv`](https://docs.astral.sh/uv/)
+- Git, because generated projects are initialized as local repositories
+
+Generated applications require provider credentials only when their external
+LLM or observability integrations are exercised.
+
+## Installation
+
+Clone the repository and synchronize its development environment:
 
 ```bash
-# macOS/Linux
-cd /path/to/cloned/agentic-ai-scaffold
-uv pip install -e .
+git clone <repository-url>
+cd agentic-ai-scaffold
+uv sync
 ```
 
-_(Installing in editable mode ensures any changes you make to your local templates are reflected globally instantenously)_
+Run the CLI from the checkout:
 
-### 3. Generate a New Project
-
-Navigate to an empty workspace folder and trigger the interactive generation wizard:
-
-```cmd
-agentic-scaffold create
+```bash
+uv run agentic-scaffold --help
+uv run agentic-scaffold create
 ```
 
----
+To expose the command as an isolated local tool:
 
-## 🗳️ Interactive Configuration Choices
+```bash
+uv tool install .
+agentic-scaffold --help
+```
 
-The wizard will guide you through building the exact architecture you need:
+Project names may contain letters, numbers, hyphens, and underscores and must
+start with a letter. The project is created beneath the current directory.
 
-1.  **Project Name:** Sets the core metadata of your system.
-2.  **Python Version:** Ppins your `uv` workspace to your selected Python runtime.
-3.  **Database ORM:** Configures an asynchronous **SQLAlchemy Engine** and Async **Alembic** migration pipeline connected to your direct database connection.
-4.  **FastMCP Server:** Generates a standalone tool server structure and embeds an MCP client wrapper into your LangGraph nodes.
-5.  **AI Observability:** Integrates **Opik** tracing decorators, automatically capturing every LLM invocation, node transition, and tool call in your dashboard.
-6.  **Pre-Commit Quality Gate:** Places a `.pre-commit-config.yaml` file into your root directory and automatically configures `Ruff` to format and lint your code before every Git commit.
+## Scaffold workflow
 
----
+During `create`, the CLI asks for:
 
-## 📂 The Generated Project Structure
+1. a project name and Python version;
+2. a database option;
+3. whether to include the MCP server;
+4. an observability option; and
+5. whether to install pre-commit hooks.
 
-The scaffolding engine generates the following clean layout inside your target folder:
+After confirmation, the orchestrator creates the project, pins Python, renders
+the selected overlays, resolves dependencies with `uv sync`, initializes Git,
+and installs the hook when selected. External command arguments are passed
+directly to subprocesses rather than through a command shell.
+
+## Generated layout
 
 ```text
 generated-project/
-├── .venv/                         # Automatically created virtual environment
-├── pyproject.toml                 # uv Workspace configuration
-├── .env.example                   # Custom configuration template
-├── Makefile                       # Cross-platform developer scripts (install, run, format)
-├── alembic.ini                    # Database migrations configuration (If DB chosen)
-│
+├── .env.example
+├── .pre-commit-config.yaml     # optional
+├── Makefile
+├── README.md
+├── pyproject.toml
 └── src/
-    ├── shared/                    # 📦 Shared Domain & Infrastructure (Cross-cutting)
-    │   ├── domain/                # Pydantic schemas, SQLAlchemy tables, custom exceptions
-    │   └── infrastructure/        # db engines (sessions, dependencies), Opik tracing
-    │
-    └── app/                       # 🚀 Micro-applications
-        ├── gateway/               # FastAPI Gateway (Lifespans, v1 routing, authentication)
-        ├── agent/                 # LangGraph workflows, states, nodes, and conditional edges
-        └── mcp_server/            # Standalone FastMCP Tool server (If MCP chosen)
+    ├── main.py
+    ├── app/
+    │   ├── agent/              # LangGraph state, nodes, edges, and graph
+    │   ├── gateway/            # FastAPI v1 routing and webhook ingestion
+    │   └── mcp_server/         # optional FastMCP server
+    └── shared/
+        ├── domain/             # application configuration and domain types
+        └── infrastructure/
+            ├── db/             # optional SQLAlchemy infrastructure/models
+            └── observability/  # optional Opik helpers
 ```
 
----
+SQLAlchemy mappings belong in
+`src/shared/infrastructure/db/models`. Keeping ORM mappings in infrastructure
+avoids coupling pure domain types to a persistence framework.
 
-## 🛠️ Extensibility (Strategy Design Pattern)
+## Development
 
-The CLI tool is engineered to allow painless upgrades. Because the CLI uses an **Overlay Extension Strategy**, you do not have to write complex `if/else` logic to add new database drivers or agent frameworks.
+The repository currently configures Ruff and pytest:
 
-To add a new extension (e.g., MongoDB support):
-
-1. Create a directory: `templates/extensions/db_mongo/`.
-2. Add your physical, raw `.py.j2` files in the exact layout you want them inside the generated project.
-3. Register your new choice inside `src/agentic_ai_scaffold/config_types.py`.
-4. The orchestrator will dynamically detect, merge, and overlay your new template files on top of the base template without modifying any of the existing CLI engine code.
-
----
-
-## 🧑‍💻 Contributing & Developer Commands
-
-When editing the CLI package itself, always run code formatting checks before committing:
-
-```cmd
-:: Format code with Ruff
-uv run ruff format .
-
-:: Lint code with Ruff
+```bash
 uv run ruff check .
+uv run ruff format --check .
+uv run pytest
 ```
 
-_Built as a modular standard for the modern AI Engineering Community._
+Build both distribution formats with:
+
+```bash
+uv build
+```
+
+The build configuration embeds the template tree in the wheel while preserving
+the checkout layout used during development.
+
+## Security considerations
+
+- Never commit generated `.env` files or real provider credentials.
+- Values in `.env.example` are placeholders and are not usable secrets.
+- The generated webhook is unauthenticated by default. Add authentication,
+  authorization, rate limiting, payload limits, and channel signature
+  verification for the intended deployment.
+- The background task runs in the API process. Use a durable queue when work
+  must survive restarts or scale across processes.
+- Review dependency versions, CORS origins, logging, and error reporting for
+  the target environment.
+
+## Known limitations
+
+- The MCP client wrapper returns a local fallback tool instead of connecting to
+  the generated MCP server.
+- Opik initialization and tracing decorators are provided but not wired into
+  the application lifecycle or graph nodes.
+- SQLAlchemy support does not include Alembic or example tables.
+- Agent responses are logged by the background task but are not returned to a
+  channel or stored.
+- The generated graph has no durable LangGraph checkpointer.
+- Generated application behavior is not yet covered by end-to-end tests.
+
+## Roadmap
+
+- Connect the LangGraph tool path to the generated MCP transport.
+- Add an optional Alembic overlay and model-discovery convention.
+- Add authenticated gateway and channel-adapter examples.
+- Add durable job processing and conversation persistence options.
+- Add rendered-project smoke tests across supported option combinations.
+- Implement or remove the placeholder database and observability choices.
+
+## Contributing
+
+Keep the base template small and introduce optional capabilities as overlays.
+Changes should include tests that render affected option combinations and must
+not introduce credentials or machine-specific output. Run the documented
+quality checks before opening a change.
+
+This repository does not currently declare a license. Until one is added, no
+open-source usage rights should be assumed.

@@ -1,80 +1,197 @@
-# Path: templates/base/README.md.j2
-# 🤖 {{ project_name }}
+# {{ project_name }}
 
-Enterprise-grade, highly scalable Omni-channel AI Agent Backend.
-Built using a Modular Monolith architecture, leveraging **FastAPI** for gateway communications, **LangGraph** for conversational logic, and **FastMCP** for decoupled tool scaling.
+A generated FastAPI and LangGraph starter application created with Agentic AI
+Scaffold. It provides an asynchronous webhook boundary and a small conversation
+graph that can be adapted to a specific product and delivery channel.
 
----
+> [!NOTE]
+> This repository is a starting point. Authentication, durable processing,
+> response delivery, deployment configuration, and integration tests must be
+> designed for the target environment.
 
-## 🏗️ Architectural Overview
+## Included components
 
-This project is built using **Domain-Driven Design (DDD)** and **Clean Architecture** principles:
+- FastAPI health and message-ingestion endpoints
+- LangGraph conversation state and routing
+- Groq and Gemini chat-model adapters
+- Pydantic Settings configuration
+{% if has_db %}
+- Async SQLAlchemy engine, sessions, and persistence-model package
+{% endif %}
+{% if has_mcp %}
+- FastMCP stdio server with an example system-time tool
+{% endif %}
+{% if has_observability %}
+- Opik configuration and tracing helpers
+{% endif %}
+{% if has_pre_commit %}
+- Ruff linting and formatting hooks through pre-commit
+{% else %}
+- Ruff linting and formatting commands
+{% endif %}
+
+## Architecture
 
 ```text
 src/
-├── shared/                     # 📦 SHARED RESOURCES (Universal Modules)
-│   ├── domain/                 # Business schemas (Pydantic), ORM models, and Custom Exceptions
-│   └── infrastructure/         # External clients: DB (SQLAlchemy Engine) & Observability (Opik)
-│
-└── app/                        # 🚀 RUNNABLE APPLICATIONS
-    ├── gateway/                # FastAPI Gateway (Handles incoming webhooks & APIs)
-    ├── agent/                  # LangGraph Brain (State machines & Agent logic)
-    └── mcp_server/             # Standalone FastMCP Tool Server (If enabled)
+├── main.py                         # FastAPI entry point
+├── app/
+│   ├── agent/                      # LangGraph state, nodes, and routing
+│   ├── gateway/api/v1/             # Versioned HTTP boundary
+{% if has_mcp %}
+│   └── mcp_server/                 # Optional FastMCP process
+{% endif %}
+└── shared/
+    ├── domain/                     # Settings and shared domain types
+    └── infrastructure/
+{% if has_db %}
+        ├── db/                     # SQLAlchemy engine, sessions, models
+{% endif %}
+{% if has_observability %}
+        └── observability/          # Opik setup helpers
+{% endif %}
 ```
 
-### Key Architectural Features:
-1. **Decoupled Gateway:** The FastAPI routers are isolated from LangGraph. The gateway normalizes incoming payloads into a generic `OmniMessage` schema, ensuring you can add Telegram or Discord without changing the agent logic.
-2. **Decoupled Tools (MCP):** Tools are treated as independent services. They are registered on a standalone FastMCP server. The LangGraph agent dynamically loads them at runtime, allowing you to update or scale tools without stopping your agent.
-3. **Async Database Engine:** Designed with SQLAlchemy `asyncio` and `asyncpg` to handle concurrent user connections typical of real-time AI agents.
+`POST /api/v1/webhooks/message` validates a generic message, returns HTTP 202,
+and schedules the LangGraph invocation as an in-process background task. The
+generated task logs the model response; it does not persist or deliver it.
 
----
+{% if has_mcp %}
+The MCP server is independently runnable. The generated agent client currently
+uses a local fallback LangChain tool and does not connect to the server. Add the
+appropriate stdio or network transport before relying on remote tool discovery.
+{% endif %}
 
-## 🛠️ Getting Started (For Windows CMD)
+## Requirements
 
-### 1. Prerequisites
-Ensure you have the blazing-fast Python package manager **`uv`** installed.
-```cmd
-pip install uv
+- Python {{ python_version }} or a compatible newer release
+- [`uv`](https://docs.astral.sh/uv/)
+{% if has_db %}
+- PostgreSQL for the generated async SQLAlchemy configuration
+{% endif %}
+
+## Setup
+
+Install the locked dependencies:
+
+```bash
+uv sync
 ```
 
-### 2. Install Dependencies
-Initialize the virtual environment and install all packages locked in the lockfile:
-```cmd
-make install
+Create a local configuration file:
+
+```bash
+# macOS/Linux
+cp .env.example .env
 ```
 
-### 3. Environment Setup
-Copy the environment template and populate it with your actual keys (Groq, Gemini, database connections):
 ```cmd
+:: Windows CMD
 copy .env.example .env
 ```
 
-### 4. Running the FastAPI Gateway
-Start the local development server with live reload enabled:
-```cmd
-make run-api
+Replace only the values required for the integrations you use. Never commit
+the resulting `.env` file.
+
+## Run the application
+
+Start the API from the project root:
+
+```bash
+uv run uvicorn main:app --app-dir src --reload
 ```
-Once running, open your browser and navigate to the interactive documentation:
-* **Interactive Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-* **API Health Check:** [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+
+Available interfaces:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Basic application health response |
+| `POST` | `/api/v1/webhooks/message` | Accept a normalized message for background processing |
+| `GET` | `/docs` | FastAPI-generated OpenAPI interface |
+
+Example development request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/webhooks/message \
+  -H "Content-Type: application/json" \
+  -d '{"sender_id":"local-user","channel":"web","text_content":"Hello"}'
+```
 
 {% if has_mcp %}
-### 5. Running the FastMCP Tool Server
-Start the tool registry server:
-```cmd
-make run-mcp
+Run the example MCP server in a separate terminal:
+
+```bash
+cd src
+uv run python -m app.mcp_server.server
 ```
 {% endif %}
 
----
+## Configuration
 
-## 📈 Quality Gates
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `APP_NAME` | No | Display name used by FastAPI |
+| `ENVIRONMENT` | No | Environment label; defaults to `development` |
+| `ENABLE_DEBUG_LOGS` | No | Enables verbose application logging |
+| `CORS_ORIGINS` | No | JSON list or comma-separated browser origins |
+| `GROQ_API_KEY` | For Groq calls | Provider credential stored as a secret value |
+| `GEMINI_API_KEY` | For Gemini calls | Provider credential stored as a secret value |
+{% if has_db %}
+| `DATABASE_URL` | For database startup | Async PostgreSQL SQLAlchemy URL |
+{% endif %}
+{% if has_observability %}
+| `OPIK_API_KEY` | For Opik | Opik credential |
+| `OPIK_WORKSPACE` | For Opik | Target workspace |
+| `OPIK_PROJECT_NAME` | No | Tracing project name |
+{% endif %}
 
-Before pushing code to production, always verify formatting and typing:
-```cmd
-# Run Ruff Code Formatter
-make format
+The current conversation node selects Groq by default. Change
+`src/app/agent/nodes.py` to make provider selection application-driven.
 
-# Run Ruff Code Linter
-make lint
+{% if has_db %}
+## Persistence models
+
+Place SQLAlchemy declarative mappings in
+`src/shared/infrastructure/db/models/`. Import mappings from that package when
+metadata or future migration tooling needs deterministic model registration.
+Keep framework-independent domain types in `src/shared/domain/`.
+
+This scaffold does not generate Alembic configuration or application tables.
+{% endif %}
+
+{% if has_observability %}
+## Observability
+
+`src/shared/infrastructure/observability/opik_setup.py` provides initialization
+and tracing helpers. They are not called automatically. Initialize Opik during
+the application lifespan and apply tracing to the operations your application
+needs before expecting telemetry.
+{% endif %}
+
+## Quality checks
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
 ```
+
+{% if has_pre_commit %}
+The scaffold installs the configured hooks during generation. Run all hooks
+manually with:
+
+```bash
+uv run pre-commit run --all-files
+```
+{% endif %}
+
+## Security and operational work
+
+Before deploying this application:
+
+- authenticate and authorize webhook callers;
+- verify signatures for integrated delivery channels;
+- restrict CORS origins and request sizes;
+- replace the in-process background task with durable processing when needed;
+- avoid logging message content or secrets in sensitive environments;
+- add response delivery, persistence, retries, and idempotency controls; and
+- add automated tests for the selected providers and infrastructure.
