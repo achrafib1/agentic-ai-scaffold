@@ -7,8 +7,8 @@ workspace initialization, virtual environment setup, template rendering, and dep
 """
 
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import questionary
 from rich.console import Console
@@ -20,7 +20,7 @@ from agentic_ai_scaffold.config_types import (
     ProjectConfiguration,
 )
 from agentic_ai_scaffold.renderer import TemplateRenderer
-from agentic_ai_scaffold.shell import run_command, is_uv_installed, install_uv_via_pip
+from agentic_ai_scaffold.shell import install_uv_via_pip, is_uv_installed, run_command
 
 console = Console()
 
@@ -46,9 +46,7 @@ class ScaffoldOrchestrator:
         # 1. PRE-CHECK: Ensure 'uv' is available before making any folders
         self._verify_or_install_uv()
 
-        console.print(
-            f"\n[bold green]🏗️  Forging Project:[/bold green] [cyan]{self.config.project_name}[/cyan]\n"
-        )
+        console.print(f"\n[bold green]🏗️  Forging Project:[/bold green] [cyan]{self.config.project_name}[/cyan]\n")
 
         with console.status(
             "[bold blue]Initializing workspace and Python environment...[/bold blue]",
@@ -68,9 +66,7 @@ class ScaffoldOrchestrator:
         ):
             self._render_templates()
 
-        with console.status(
-            "[bold blue]Resolving dependencies via uv...[/bold blue]", spinner="dots"
-        ):
+        with console.status("[bold blue]Resolving dependencies via uv...[/bold blue]", spinner="dots"):
             self._install_dependencies()
 
         with console.status(
@@ -104,14 +100,10 @@ class ScaffoldOrchestrator:
         ).ask()
 
         if install_choice:
-            with console.status(
-                "[bold green]Installing uv...[/bold green]", spinner="dots"
-            ):
+            with console.status("[bold green]Installing uv...[/bold green]", spinner="dots"):
                 success = install_uv_via_pip()
             if success:
-                console.print(
-                    "[bold green]✅ 'uv' installed successfully![/bold green]\n"
-                )
+                console.print("[bold green]✅ 'uv' installed successfully![/bold green]\n")
                 return
 
         # If installation fails or is declined, provide manual setup instructions
@@ -119,7 +111,8 @@ class ScaffoldOrchestrator:
             Panel(
                 "[bold red]❌ Scaffolding aborted. 'uv' must be installed manually to proceed.[/bold red]\n\n"
                 "[bold yellow]How to install uv:[/bold yellow]\n"
-                '• Windows (CMD):   [cyan]powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"[/cyan]\n'
+                "• Windows:        [cyan]See https://docs.astral.sh/uv/"
+                "getting-started/installation/[/cyan]\n"
                 "• macOS/Linux:     [cyan]curl -LsSf https://astral.sh/uv/install.sh | sh[/cyan]\n"
                 "• Via pip:         [cyan]pip install uv[/cyan]",
                 title="Manual Setup Guide",
@@ -131,16 +124,15 @@ class ScaffoldOrchestrator:
     def _initialize_workspace(self) -> None:
         """Creates the directory and initializes uv."""
         self.target_dir.mkdir(parents=True, exist_ok=True)
+        run_command(["uv", "init", self.config.project_name], cwd=str(self.target_dir.parent))
         run_command(
-            f"uv init {self.config.project_name}", cwd=str(self.target_dir.parent)
-        )
-        run_command(
-            f"uv python pin {self.config.python_version}", cwd=str(self.target_dir)
+            ["uv", "python", "pin", self.config.python_version],
+            cwd=str(self.target_dir),
         )
 
     def _setup_virtual_environment(self) -> None:
         """Explicitly builds the .venv virtual environment inside the target folder."""
-        run_command("uv venv", cwd=str(self.target_dir))
+        run_command(["uv", "venv"], cwd=str(self.target_dir))
 
     def _render_templates(self) -> None:
         """Applies the base template and any selected extensions."""
@@ -149,9 +141,7 @@ class ScaffoldOrchestrator:
 
         # 2. Database Overlay
         if self.config.database == DatabaseChoice.SQLALCHEMY:
-            self.renderer.render_overlay(
-                "extensions/db_sqlalchemy", str(self.target_dir)
-            )
+            self.renderer.render_overlay("extensions/db_sqlalchemy", str(self.target_dir))
 
         # 3. MCP Server Overlay
         if self.config.include_mcp:
@@ -161,28 +151,24 @@ class ScaffoldOrchestrator:
         if self.config.observability == ObservabilityChoice.OPIK:
             self.renderer.render_overlay("extensions/obs_opik", str(self.target_dir))
 
+        if self.config.include_pre_commit:
+            self.renderer.render_overlay("extensions/quality_pre_commit", str(self.target_dir))
+
     def _install_dependencies(self) -> None:
         """Installs the locked dependencies."""
-        run_command("uv sync", cwd=str(self.target_dir))
+        run_command(["uv", "sync"], cwd=str(self.target_dir))
 
     def _finalize_setup(self) -> None:
         """Initializes Git and sets up pre-commit hooks."""
-        run_command("git init", cwd=str(self.target_dir))
+        run_command(["git", "init"], cwd=str(self.target_dir))
 
         if self.config.include_pre_commit:
-            # We explicitly add pre-commit and ruff to development dependencies
-            run_command("uv add --dev pre-commit ruff", cwd=str(self.target_dir))
-            # Now uv can safely run it inside the project context!
-            run_command("uv run pre-commit install", cwd=str(self.target_dir))
+            run_command(["uv", "run", "pre-commit", "install"], cwd=str(self.target_dir))
 
     def _print_success_summary(self) -> None:
         """Prints the final success screen to the user."""
-        console.print(
-            "\n[bold green]✨ Project successfully scaffolded! ✨[/bold green]\n"
-        )
+        console.print("\n[bold green]✨ Project successfully scaffolded! ✨[/bold green]\n")
         console.print(f"👉 [bold cyan]cd {self.config.project_name}[/bold cyan]")
-        console.print(
-            f"👉 [bold cyan]Activate environment: .venv\\Scripts\\activate[/bold cyan] (Windows cmd)"
-        )
+        console.print("👉 [bold cyan]Activate environment: .venv\\Scripts\\activate[/bold cyan] (Windows cmd)")
         console.print("👉 [bold cyan]uv sync[/bold cyan]")
         console.print("\n[dim]Happy coding! Building the future of AI Agents.[/dim]\n")

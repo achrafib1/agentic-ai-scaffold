@@ -11,6 +11,30 @@ dependencies = [
     "jinja2>=3.1.3",
 ]
 
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_ai_scaffold"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"templates" = "agentic_ai_scaffold/templates"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/templates",
+    "/README.md",
+    "/pyproject.toml",
+]
+
 [project.scripts]
 # Exposes the command globally. On Windows cmd, after sync, you run: uv run agentic-scaffold create
 agentic-scaffold = "agentic_ai_scaffold.cli:app"
@@ -21,3 +45,6 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

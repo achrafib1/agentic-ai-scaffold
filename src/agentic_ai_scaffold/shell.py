@@ -9,7 +9,7 @@ cross-platform executable detection (via shutil), and automated installation scr
 import shutil
 import subprocess
 import sys
-from typing import Optional
+from collections.abc import Sequence
 
 from rich.console import Console
 from rich.panel import Panel
@@ -48,14 +48,12 @@ def install_uv_via_pip() -> bool:
         return False
 
 
-def run_command(
-    command: str, cwd: Optional[str] = None, hide_output: bool = True
-) -> None:
+def run_command(command: Sequence[str], cwd: str | None = None, hide_output: bool = True) -> None:
     """
     Executes a shell command safely in a specified directory.
 
     Args:
-        command (str): The shell command to execute.
+        command (Sequence[str]): The executable and arguments to execute.
         cwd (Optional[str]): The directory to execute the command in. Defaults to current.
         hide_output (bool): If True, suppresses standard output unless an error occurs.
 
@@ -64,14 +62,19 @@ def run_command(
     """
     try:
         subprocess.run(
-            command,
+            list(command),
             cwd=cwd,
-            shell=True,
+            shell=False,
             check=True,
             text=True,
             capture_output=hide_output,
         )
     except subprocess.CalledProcessError as e:
-        error_msg = f"[bold red]Command Failed:[/bold red] {command}\n\n[bold yellow]Error Output:[/bold yellow]\n{e.stderr}"
+        display_command = " ".join(command)
+        output = e.stderr or e.stdout or "No command output was captured."
+        error_msg = (
+            f"[bold red]Command Failed:[/bold red] {display_command}\n\n"
+            f"[bold yellow]Error Output:[/bold yellow]\n{output}"
+        )
         console.print(Panel(error_msg, title="🚨 Execution Error", border_style="red"))
         sys.exit(1)

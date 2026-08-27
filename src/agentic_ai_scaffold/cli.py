@@ -17,6 +17,7 @@ from agentic_ai_scaffold.config_types import (
     DatabaseChoice,
     ObservabilityChoice,
     ProjectConfiguration,
+    validate_project_name,
 )
 from agentic_ai_scaffold.orchestrator import ScaffoldOrchestrator
 
@@ -51,12 +52,10 @@ def create() -> None:
         # Interactive Prompting
         project_name = questionary.text(
             "What is the name of your project?",
-            validate=lambda text: len(text) > 0 or "Project name cannot be empty.",
+            validate=validate_project_name,
         ).ask()
 
-        python_version = questionary.text(
-            "Which Python version should uv pin?", default="3.12"
-        ).ask()
+        python_version = questionary.text("Which Python version should uv pin?", default="3.12").ask()
 
         db_raw = questionary.select(
             "Which Database ORM do you want to configure?",
@@ -65,9 +64,7 @@ def create() -> None:
 
         # Handle 'Coming Soon' selections gracefully
         if "Coming Soon" in db_raw:
-            console.print(
-                f"\n[bold yellow]⚠️ {db_raw} is currently in development. Exiting.[/bold yellow]"
-            )
+            console.print(f"\n[bold yellow]⚠️ {db_raw} is currently in development. Exiting.[/bold yellow]")
             sys.exit(0)
 
         include_mcp = questionary.confirm(
@@ -80,9 +77,7 @@ def create() -> None:
         ).ask()
 
         if "Coming Soon" in obs_raw:
-            console.print(
-                f"\n[bold yellow]⚠️ {obs_raw} is currently in development. Exiting.[/bold yellow]"
-            )
+            console.print(f"\n[bold yellow]⚠️ {obs_raw} is currently in development. Exiting.[/bold yellow]")
             sys.exit(0)
 
         include_pre_commit = questionary.confirm(
@@ -114,9 +109,7 @@ def version() -> None:
     """
     Displays the current version of the agentic-ai-scaffold tool.
     """
-    console.print(
-        "[bold cyan]Agentic AI Scaffold CLI[/bold cyan] version: [bold green]0.1.0[/bold green]"
-    )
+    console.print("[bold cyan]Agentic AI Scaffold CLI[/bold cyan] version: [bold green]0.1.0[/bold green]")
 
 
 if __name__ == "__main__":

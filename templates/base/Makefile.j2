@@ -11,12 +11,12 @@ install:
 
 run-api:
 	@echo "Starting FastAPI Gateway..."
-	uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+	uv run uvicorn main:app --app-dir src --host 0.0.0.0 --port 8000 --reload
 
 run-mcp:
 {% if has_mcp %}
 	@echo "Starting FastMCP Server..."
-	uv run python src/app/mcp_server/server.py
+	cd src && uv run python -m app.mcp_server.server
 {% else %}
 	@echo "MCP Server is not configured for this project."
 {% endif %}

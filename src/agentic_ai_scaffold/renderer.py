@@ -30,13 +30,9 @@ class TemplateRenderer:
         """
         self.config = config
 
-        # PRO PATH RESOLUTION:
-        # We need to go up exactly 3 levels to reach the PROJECT_ROOT (File -> Module -> Src -> Root)
-        # parents[0] = src/agentic_ai_scaffold/
-        # parents[1] = src/
-        # parents[2] = PROJECT_ROOT/ (The nested Git Repo root where 'templates' lives)
-        cli_root = Path(__file__).resolve().parents[2]
-        self.template_base_dir = (cli_root / "templates").resolve()
+        package_templates = Path(__file__).resolve().parent / "templates"
+        checkout_templates = Path(__file__).resolve().parents[2] / "templates"
+        self.template_base_dir = (package_templates if package_templates.is_dir() else checkout_templates).resolve()
 
         # Fail early and informatively if the templates directory is missing
         if not self.template_base_dir.exists():
@@ -52,6 +48,7 @@ class TemplateRenderer:
             "has_db": self.config.database.value != "none",
             "has_mcp": self.config.include_mcp,
             "has_observability": self.config.observability.value != "none",
+            "has_pre_commit": self.config.include_pre_commit,
         }
 
     def render_overlay(self, overlay_path: str, destination_dir: str) -> None:
@@ -68,9 +65,7 @@ class TemplateRenderer:
         if not source_dir.exists():
             return  # Fail gracefully if an extension template doesn't exist yet
 
-        env = Environment(
-            loader=FileSystemLoader(str(source_dir)), keep_trailing_newline=True
-        )
+        env = Environment(loader=FileSystemLoader(str(source_dir)), keep_trailing_newline=True)
 
         for root, dirs, files in os.walk(source_dir):
             relative_root = Path(root).relative_to(source_dir)
